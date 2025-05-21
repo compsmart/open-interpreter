@@ -27,14 +27,16 @@ class Profile:
     """
 
     DEFAULT_PROFILE_FOLDER = "~/.openinterpreter"
-    DEFAULT_PROFILE_PATH = os.path.join(DEFAULT_PROFILE_FOLDER, "default_profile.py")
+    DEFAULT_PROFILE_PATH = os.path.join(
+        DEFAULT_PROFILE_FOLDER, "default_profile.py")
 
     def __init__(self):
         # Default values if no profile exists
         # Model configuration
         self.model = "claude-3-5-sonnet-20241022"  # The LLM model to use
         self.provider = (
-            None  # The model provider (e.g. anthropic, openai) None will auto-detect
+            # The model provider (e.g. anthropic, openai) None will auto-detect
+            None
         )
         self.temperature = 0  # Sampling temperature for model outputs (0-1)
         self.max_tokens = None  # Maximum tokens in a message
@@ -54,7 +56,7 @@ class Profile:
         self.input = None  # Pre-filled first user message
 
         # Available tools and settings
-        self.tools = ["interpreter", "editor"]  # Enabled tool modules
+        self.tools = ["interpreter", "editor", "test"]  # Enabled tool modules
         self.auto_run = False  # Whether to auto-run tools without confirmation
         self.tool_calling = True  # Whether to allow tool/function calling
         self.interactive = sys.stdin.isatty()  # Whether to prompt for input
@@ -157,11 +159,13 @@ class Profile:
             if "interpreter" in namespace:
                 for key in self.to_dict().keys():
                     if hasattr(namespace["interpreter"], key):
-                        setattr(self, key, getattr(namespace["interpreter"], key))
+                        setattr(self, key, getattr(
+                            namespace["interpreter"], key))
             else:
                 print("Failed to load profile, no interpreter object found")
         except Exception as e:
-            raise ValueError(f"Failed to load profile at {path}. Error: {str(e)}")
+            raise ValueError(
+                f"Failed to load profile at {path}. Error: {str(e)}")
 
     @classmethod
     def from_file(cls, path):

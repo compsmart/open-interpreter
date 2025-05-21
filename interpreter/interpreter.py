@@ -1,3 +1,24 @@
+from .ui.tool import ToolRenderer
+from .ui.markdown import MarkdownRenderer
+from .tools import BashTool, ComputerTool, EditTool, TestTool, ToolCollection, ToolResult
+from .profiles import Profile
+from .misc.spinner import SimpleSpinner
+from .commands import CommandHandler
+from anthropic.types.beta import (
+    BetaContentBlock,
+    BetaContentBlockParam,
+    BetaImageBlockParam,
+    BetaMessage,
+    BetaRawContentBlockDeltaEvent,
+    BetaRawContentBlockStartEvent,
+    BetaRawContentBlockStopEvent,
+    BetaTextBlockParam,
+    BetaToolResultBlockParam,
+)
+from anthropic import Anthropic
+import litellm
+from urllib.parse import quote
+import webbrowser
 import asyncio
 import dataclasses
 import json
@@ -16,35 +37,13 @@ from .misc.get_input import async_get_input
 
 # Third-party imports
 os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
-import webbrowser
-from urllib.parse import quote
 
-import litellm
 
 litellm.suppress_debug_info = True
 litellm.REPEATED_STREAMING_CHUNK_LIMIT = 99999999
 litellm.modify_params = True
 # litellm.drop_params = True
 
-from anthropic import Anthropic
-from anthropic.types.beta import (
-    BetaContentBlock,
-    BetaContentBlockParam,
-    BetaImageBlockParam,
-    BetaMessage,
-    BetaRawContentBlockDeltaEvent,
-    BetaRawContentBlockStartEvent,
-    BetaRawContentBlockStopEvent,
-    BetaTextBlockParam,
-    BetaToolResultBlockParam,
-)
-
-from .commands import CommandHandler
-from .misc.spinner import SimpleSpinner
-from .profiles import Profile
-from .tools import BashTool, ComputerTool, EditTool, ToolCollection, ToolResult
-from .ui.markdown import MarkdownRenderer
-from .ui.tool import ToolRenderer
 
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
@@ -58,7 +57,8 @@ def _make_api_tool_result(
     result: ToolResult, tool_use_id: str
 ) -> BetaToolResultBlockParam:
     """Convert an agent ToolResult to an API ToolResultBlockParam."""
-    tool_result_content: list[BetaTextBlockParam | BetaImageBlockParam] | str = []
+    tool_result_content: list[BetaTextBlockParam |
+                              BetaImageBlockParam] | str = []
     is_error = False
     if result.error:
         is_error = True
@@ -210,7 +210,8 @@ class Interpreter:
 
         # Add web search capability if enabled
         if (
-            os.environ.get("INTERPRETER_EXPERIMENTAL_WEB_SEARCH", "false").lower()
+            os.environ.get(
+                "INTERPRETER_EXPERIMENTAL_WEB_SEARCH", "false").lower()
             == "true"
         ):
             system_message = system_message.replace(
@@ -242,6 +243,8 @@ class Interpreter:
             tools.append(EditTool())
         if "gui" in self.tools:
             tools.append(ComputerTool())
+        if "test" in self.tools:
+            tools.append(TestTool())
 
         tool_collection = ToolCollection(*tools)
 
@@ -317,7 +320,7 @@ class Interpreter:
 
                 model = self.model
                 if model.startswith("anthropic/"):
-                    model = model[len("anthropic/") :]
+                    model = model[len("anthropic/"):]
 
                 # Use Anthropic API which supports betas
                 raw_response = self._client.beta.messages.create(
@@ -412,7 +415,8 @@ class Interpreter:
                     )
 
                 content_blocks = cast(list[BetaContentBlock], response.content)
-                tool_use_blocks = [b for b in content_blocks if b.type == "tool_use"]
+                tool_use_blocks = [
+                    b for b in content_blocks if b.type == "tool_use"]
 
                 # If there are no tool use blocks, we're done
                 if not tool_use_blocks:
@@ -430,7 +434,8 @@ class Interpreter:
                         if all_approved:
                             user_approval = "y"
                         else:
-                            print(f"\n\033[38;5;240mRun all actions above\033[0m?")
+                            print(
+                                f"\n\033[38;5;240mRun all actions above\033[0m?")
                             user_approval = self._ask_user_approval()
 
                         if not self.interactive:
@@ -445,7 +450,7 @@ class Interpreter:
                             if tool_block.name == "str_replace_editor":
                                 path = tool_block.input.get("path")
                                 if path.startswith(os.getcwd()):
-                                    path = path[len(os.getcwd()) + 1 :]
+                                    path = path[len(os.getcwd()) + 1:]
                                     if path == "":
                                         path = "/"
 
@@ -482,7 +487,8 @@ class Interpreter:
                                             f"\n\033[38;5;240mEdits to {path} will be auto-approved in this session.\033[0m\n"
                                         )
                                 else:  # bash/computer tools
-                                    command = tool_block.input.get("command", "")
+                                    command = tool_block.input.get(
+                                        "command", "")
                                     if command:
                                         self.allowed_commands.append(command)
                                         print(
@@ -496,7 +502,8 @@ class Interpreter:
                         if user_approval in ["y", "a"]:
                             result = await tool_collection.run(
                                 name=content_block.name,
-                                tool_input=cast(dict[str, Any], content_block.input),
+                                tool_input=cast(
+                                    dict[str, Any], content_block.input),
                             )
                         else:
                             if self.interactive:
@@ -529,13 +536,13 @@ class Interpreter:
 
             else:
                 tools = []
-                if "interpreter" in self.tools:
-                    tools.append(
-                        {
-                            "type": "function",
-                            "function": {
-                                "name": "bash",
-                                "description": """Run commands in a bash shell\n
+            if "interpreter" in self.tools:
+                tools.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "bash",
+                            "description": """Run commands in a bash shell\n
                                 * When invoking this tool, the contents of the \"command\" parameter does NOT need to be XML-escaped.\n
                                 * You don't have access to the internet via this tool.\n
                                 * You do have access to a mirror of common linux and python packages via apt and pip.\n
@@ -543,26 +550,51 @@ class Interpreter:
                                 * To inspect a particular line range of a file, e.g. lines 10-25, try 'sed -n 10,25p /path/to/the/file'.\n
                                 * Please avoid commands that may produce a very large amount of output.\n
                                 * Please run long lived commands in the background, e.g. 'sleep 10 &' or start a server in the background.""",
-                                "parameters": {
-                                    "type": "object",
-                                    "properties": {
-                                        "command": {
-                                            "type": "string",
-                                            "description": "The bash command to run.",
-                                        }
-                                    },
-                                    "required": ["command"],
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "command": {
+                                        "type": "string",
+                                        "description": "The bash command to run.",
+                                    }
                                 },
+                                "required": ["command"],
                             },
-                        }
-                    )
-                if "editor" in self.tools:
-                    tools.append(
-                        {
-                            "type": "function",
-                            "function": {
-                                "name": "str_replace_editor",
-                                "description": """Custom editing tool for viewing, creating and editing files
+                        },
+                    }
+                )
+            if "test" in self.tools:
+                tools.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "test",
+                            "description": "A test tool with three different functions: test1 outputs 'hello world', test2 outputs a personalized greeting, and test3 outputs 'goodbye'",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "function_name": {
+                                        "type": "string",
+                                        "enum": ["test1", "test2", "test3"],
+                                        "description": "The test function to execute"
+                                    },
+                                    "user_name": {
+                                        "type": "string",
+                                        "description": "Optional user name for test2 function"
+                                    }
+                                },
+                                "required": ["function_name"],
+                            },
+                        },
+                    }
+                )
+            if "editor" in self.tools:
+                tools.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "str_replace_editor",
+                            "description": """Custom editing tool for viewing, creating and editing files
 * State is persistent across command calls and discussions with the user
 * If `path` is a file, `view` displays the result of applying `cat -n`. If `path` is a directory, `view` lists non-hidden files and directories up to 2 levels deep
 * The `create` command cannot be used if the specified `path` already exists as a file
@@ -573,383 +605,385 @@ Notes for using the `str_replace` command:
 * The `old_str` parameter should match EXACTLY one or more consecutive lines from the original file. Be mindful of whitespaces!
 * If the `old_str` parameter is not unique in the file, the replacement will not be performed. Make sure to include enough context in `old_str` to make it unique
 * The `new_str` parameter should contain the edited lines that should replace the `old_str`""",
-                                "parameters": {
-                                    "type": "object",
-                                    "properties": {
-                                        "command": {
-                                            "type": "string",
-                                            "description": "The command to execute: view, create, str_replace, insert, or undo_edit",
-                                            "enum": [
-                                                "view",
-                                                "create",
-                                                "str_replace",
-                                                "insert",
-                                                "undo_edit",
-                                            ],
-                                        },
-                                        "path": {
-                                            "type": "string",
-                                            "description": "Absolute path to the file or directory",
-                                        },
-                                        "file_text": {
-                                            "type": "string",
-                                            "description": "File content for create command",
-                                        },
-                                        "view_range": {
-                                            "type": "array",
-                                            "description": "Two integers specifying start and end line numbers for view command",
-                                            "items": {"type": "integer"},
-                                            "minItems": 2,
-                                            "maxItems": 2,
-                                        },
-                                        "old_str": {
-                                            "type": "string",
-                                            "description": "Text to replace for str_replace command",
-                                        },
-                                        "new_str": {
-                                            "type": "string",
-                                            "description": "Replacement text for str_replace or insert commands",
-                                        },
-                                        "insert_line": {
-                                            "type": "integer",
-                                            "description": "Line number where to insert text for insert command",
-                                        },
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "command": {
+                                        "type": "string",
+                                        "description": "The command to execute: view, create, str_replace, insert, or undo_edit",
+                                        "enum": [
+                                            "view",
+                                            "create",
+                                            "str_replace",
+                                            "insert",
+                                            "undo_edit",
+                                        ],
                                     },
-                                    "required": ["command", "path"],
+                                    "path": {
+                                        "type": "string",
+                                        "description": "Absolute path to the file or directory",
+                                    },
+                                    "file_text": {
+                                        "type": "string",
+                                        "description": "File content for create command",
+                                    },
+                                    "view_range": {
+                                        "type": "array",
+                                        "description": "Two integers specifying start and end line numbers for view command",
+                                        "items": {"type": "integer"},
+                                        "minItems": 2,
+                                        "maxItems": 2,
+                                    },
+                                    "old_str": {
+                                        "type": "string",
+                                        "description": "Text to replace for str_replace command",
+                                    },
+                                    "new_str": {
+                                        "type": "string",
+                                        "description": "Replacement text for str_replace or insert commands",
+                                    },
+                                    "insert_line": {
+                                        "type": "integer",
+                                        "description": "Line number where to insert text for insert command",
+                                    },
                                 },
+                                "required": ["command", "path"],
                             },
-                        }
-                    )
-                if "gui" in self.tools:
-                    tools.append(
-                        {
-                            "type": "function",
-                            "function": {
-                                "name": "computer",
-                                "description": """Control the computer's mouse, keyboard and screen interactions
+                        },
+                    }
+                )
+            if "gui" in self.tools:
+                tools.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "computer",
+                            "description": """Control the computer's mouse, keyboard and screen interactions
                         * Coordinates are scaled to standard resolutions (max 1366x768)
                         * Screenshots are automatically taken after most actions
                         * For key commands, use normalized key names (e.g. 'pagedown' -> 'pgdn', 'enter'/'return' are interchangeable)
                         * On macOS, 'super+' is automatically converted to 'command+'
                         * Mouse movements use smooth easing for natural motion""",
-                                "parameters": {
-                                    "type": "object",
-                                    "properties": {
-                                        "action": {
-                                            "type": "string",
-                                            "description": "The action to perform",
-                                            "enum": [
-                                                "key",  # Send keyboard input (hotkeys or single keys)
-                                                "type",  # Type text with a slight delay between characters
-                                                "mouse_move",  # Move mouse cursor to coordinates
-                                                "left_click",  # Perform left mouse click
-                                                "left_click_drag",  # Click and drag from current pos to coordinates
-                                                "right_click",  # Perform right mouse click
-                                                "middle_click",  # Perform middle mouse click
-                                                "double_click",  # Perform double left click
-                                                "screenshot",  # Take a screenshot
-                                                "cursor_position",  # Get current cursor coordinates
-                                            ],
-                                        },
-                                        "text": {
-                                            "type": "string",
-                                            "description": "Text to type or key command to send (required for 'key' and 'type' actions)",
-                                        },
-                                        "coordinate": {
-                                            "type": "array",
-                                            "description": "X,Y coordinates for mouse actions (required for 'mouse_move' and 'left_click_drag')",
-                                            "items": {"type": "integer"},
-                                            "minItems": 2,
-                                            "maxItems": 2,
-                                        },
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "action": {
+                                        "type": "string",
+                                        "description": "The action to perform",
+                                        "enum": [
+                                            # Send keyboard input (hotkeys or single keys)
+                                            "key",
+                                            "type",  # Type text with a slight delay between characters
+                                            "mouse_move",  # Move mouse cursor to coordinates
+                                            "left_click",  # Perform left mouse click
+                                            "left_click_drag",  # Click and drag from current pos to coordinates
+                                            "right_click",  # Perform right mouse click
+                                            "middle_click",  # Perform middle mouse click
+                                            "double_click",  # Perform double left click
+                                            "screenshot",  # Take a screenshot
+                                            "cursor_position",  # Get current cursor coordinates
+                                        ],
                                     },
-                                    "required": ["action"],
+                                    "text": {
+                                        "type": "string",
+                                        "description": "Text to type or key command to send (required for 'key' and 'type' actions)",
+                                    },
+                                    "coordinate": {
+                                        "type": "array",
+                                        "description": "X,Y coordinates for mouse actions (required for 'mouse_move' and 'left_click_drag')",
+                                        "items": {"type": "integer"},
+                                        "minItems": 2,
+                                        "maxItems": 2,
+                                    },
                                 },
+                                "required": ["action"],
                             },
-                        }
-                    )
+                        },
+                    }
+                )
 
-                if self.model.startswith("ollama/"):
-                    # Fix ollama
-                    stream = False
-                    actual_model = self.model.replace("ollama/", "openai/")
-                    if self.api_base is None:
-                        api_base = "http://localhost:11434/v1/"
-                    else:
-                        api_base = self.api_base
+            if self.model.startswith("ollama/"):
+                # Fix ollama
+                stream = False
+                actual_model = self.model.replace("ollama/", "openai/")
+                if self.api_base is None:
+                    api_base = "http://localhost:11434/v1/"
                 else:
-                    if (
-                        not self.model.startswith("openai/")
-                        and self.provider == "openai"
-                    ):
-                        actual_model = "openai/" + self.model
-                    else:
-                        actual_model = self.model
-
-                    stream = True
                     api_base = self.api_base
+            else:
+                if (
+                    not self.model.startswith("openai/")
+                    and self.provider == "openai"
+                ):
+                    actual_model = "openai/" + self.model
+                else:
+                    actual_model = self.model
 
-                if not self.tool_calling:
-                    system_message += "\n\nPLEASE write code to satisfy the user's request, use ```bash\n...\n``` to run code. You CAN run code."
+                stream = True
+                api_base = self.api_base
 
-                params = {
-                    "model": actual_model,
-                    "messages": [{"role": "system", "content": system_message}]
-                    + self.messages,
-                    "stream": stream,
-                    "api_base": api_base,
-                    "temperature": self.temperature,
-                    "api_key": self.api_key,
-                    "api_version": self.api_version,
-                    # "parallel_tool_calls": True,
+            if not self.tool_calling:
+                system_message += "\n\nPLEASE write code to satisfy the user's request, use ```bash\n...\n``` to run code. You CAN run code."
+
+            params = {
+                "model": actual_model,
+                "messages": [{"role": "system", "content": system_message}]
+                + self.messages,
+                "stream": stream,
+                "api_base": api_base,
+                "temperature": self.temperature,
+                "api_key": self.api_key,
+                "api_version": self.api_version,
+                # "parallel_tool_calls": True,
+            }
+
+            if self.tool_calling:
+                params["tools"] = tools
+            else:
+                params["stream"] = False
+                stream = False
+
+            if provider == "anthropic" and self.tool_calling:
+                params["tools"] = tool_collection.to_params()
+                for t in params["tools"]:
+                    t["function"] = {"name": t["name"]}
+                    if t["name"] == "computer":
+                        t["function"]["parameters"] = {
+                            "display_height_px": t["display_height_px"],
+                            "display_width_px": t["display_width_px"],
+                            "display_number": t["display_number"],
+                        }
+                params["extra_headers"] = {
+                    "anthropic-beta": "computer-use-2024-10-22"
                 }
 
-                if self.tool_calling:
-                    params["tools"] = tools
-                else:
-                    params["stream"] = False
-                    stream = False
+            # if self.debug:
+            #     print("Sending request...", params)
+            #     time.sleep(3)
 
-                if provider == "anthropic" and self.tool_calling:
-                    params["tools"] = tool_collection.to_params()
-                    for t in params["tools"]:
-                        t["function"] = {"name": t["name"]}
-                        if t["name"] == "computer":
-                            t["function"]["parameters"] = {
-                                "display_height_px": t["display_height_px"],
-                                "display_width_px": t["display_width_px"],
-                                "display_number": t["display_number"],
-                            }
-                    params["extra_headers"] = {
-                        "anthropic-beta": "computer-use-2024-10-22"
-                    }
-
-                # if self.debug:
-                #     print("Sending request...", params)
-                #     time.sleep(3)
-
-                if self.debug:
-                    print("Messages:")
-                    for m in self.messages:
-                        if len(str(m)) > 1000:
-                            print(str(m)[:1000] + "...")
-                        else:
-                            print(str(m))
-                    print()
-
-                raw_response = litellm.completion(**params)
-
-                if not stream:
-                    raw_response.choices[0].delta = raw_response.choices[0].message
-                    raw_response = [raw_response]
-
-                if not self.tool_calling:
-                    # Add the original message to the messages list
-                    self.messages.append(
-                        {
-                            "role": "assistant",
-                            "content": raw_response[0].choices[0].delta.content,
-                        }
-                    )
-
-                    # Extract code blocks from non-tool-calling response
-                    content = raw_response[0].choices[0].delta.content
-                    message = raw_response[0].choices[0].delta
-                    message.tool_calls = []
-                    message.content = ""
-
-                    # Find all code blocks between backticks
-                    while "```" in content:
-                        try:
-                            # Split on first ``` to get everything after it
-                            before, rest = content.split("```", 1)
-                            message.content += before
-
-                            # Handle optional language identifier
-                            if "\n" in rest:
-                                maybe_lang, rest = rest.split("\n", 1)
-                            else:
-                                maybe_lang = ""
-
-                            # Split on closing ``` to get code block
-                            code, content = rest.split("```", 1)
-
-                            # Create tool call for the code block
-                            tool_call = type(
-                                "ToolCall",
-                                (),
-                                {
-                                    "id": f"call_{len(message.tool_calls)}",
-                                    "function": type(
-                                        "Function",
-                                        (),
-                                        {
-                                            "name": "bash",
-                                            "arguments": json.dumps(
-                                                {"command": code.strip()}
-                                            ),
-                                        },
-                                    ),
-                                },
-                            )
-                            message.tool_calls.append(tool_call)
-
-                        except ValueError:
-                            # Handle malformed code blocks by breaking
-                            break
-
-                    # Add any remaining content after the last code block
-                    message.content += content
-                    raw_response = [raw_response[0]]
-
-                message = None
-                first_token = True
-
-                for chunk in raw_response:
-                    yield chunk
-
-                    if first_token:
-                        self._spinner.stop()
-                        first_token = False
-
-                    if message is None:
-                        message = chunk.choices[0].delta
-
-                    if chunk.choices[0].delta.content:
-                        md.feed(chunk.choices[0].delta.content)
-                        await asyncio.sleep(0)
-
-                        if message.content is None:
-                            message.content = chunk.choices[0].delta.content
-                        elif chunk.choices[0].delta.content is not None:
-                            message.content += chunk.choices[0].delta.content
-
-                    if chunk.choices[0].delta.tool_calls:
-                        if chunk.choices[0].delta.tool_calls[0].id:
-                            if message.tool_calls is None or chunk.choices[
-                                0
-                            ].delta.tool_calls[0].id not in [
-                                t.id for t in message.tool_calls
-                            ]:
-                                edit.close()
-                                edit = ToolRenderer()
-                                if message.tool_calls is None:
-                                    message.tool_calls = []
-                                message.tool_calls.append(
-                                    chunk.choices[0].delta.tool_calls[0]
-                                )
-                            current_tool_call = [
-                                t
-                                for t in message.tool_calls
-                                if t.id == chunk.choices[0].delta.tool_calls[0].id
-                            ][0]
-
-                        if chunk.choices[0].delta.tool_calls[0].function.name:
-                            tool_name = (
-                                chunk.choices[0].delta.tool_calls[0].function.name
-                            )
-                            if edit.name is None:
-                                edit.name = tool_name
-                            if current_tool_call.function.name is None:
-                                current_tool_call.function.name = tool_name
-                        if chunk.choices[0].delta.tool_calls[0].function.arguments:
-                            arguments_delta = (
-                                chunk.choices[0].delta.tool_calls[0].function.arguments
-                            )
-                            edit.feed(arguments_delta)
-
-                            if chunk.choices[0].delta != message:
-                                current_tool_call.function.arguments += arguments_delta
-
-                    if chunk.choices[0].finish_reason:
-                        edit.close()
-                        edit = ToolRenderer()
-
-                if self.tool_calling:
-                    self.messages.append(message)
-
+            if self.debug:
+                print("Messages:")
+                for m in self.messages:
+                    if len(str(m)) > 1000:
+                        print(str(m)[:1000] + "...")
+                    else:
+                        print(str(m))
                 print()
 
-                if not message.tool_calls:
-                    break
+            raw_response = litellm.completion(**params)
 
-                if self.auto_run:
-                    user_approval = "y"
-                else:
-                    user_approval = input("\nRun tool(s)? (y/n): ").lower().strip()
+            if not stream:
+                raw_response.choices[0].delta = raw_response.choices[0].message
+                raw_response = [raw_response]
 
-                user_content_to_add = []
+            if not self.tool_calling:
+                # Add the original message to the messages list
+                self.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": raw_response[0].choices[0].delta.content,
+                    }
+                )
 
-                for tool_call in message.tool_calls:
-                    function_arguments = json.loads(tool_call.function.arguments)
+                # Extract code blocks from non-tool-calling response
+                content = raw_response[0].choices[0].delta.content
+                message = raw_response[0].choices[0].delta
+                message.tool_calls = []
+                message.content = ""
 
-                    if user_approval == "y":
-                        result = await tool_collection.run(
-                            name=tool_call.function.name,
-                            tool_input=cast(dict[str, Any], function_arguments),
-                        )
-                    else:
-                        result = ToolResult(output="Tool execution cancelled by user")
+                # Find all code blocks between backticks
+                while "```" in content:
+                    try:
+                        # Split on first ``` to get everything after it
+                        before, rest = content.split("```", 1)
+                        message.content += before
 
-                    if self.tool_calling:
-                        if result.error:
-                            output = result.error
+                        # Handle optional language identifier
+                        if "\n" in rest:
+                            maybe_lang, rest = rest.split("\n", 1)
                         else:
-                            output = result.output
+                            maybe_lang = ""
 
-                        tool_output = ""
+                        # Split on closing ``` to get code block
+                        code, content = rest.split("```", 1)
 
-                        if output:
-                            tool_output += output
-
-                        if result.base64_image:
-                            tool_output += (
-                                "\nThe user will reply with the tool's image output."
-                            )
-                            user_content_to_add.append(
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:image/png;base64,{result.base64_image}",
-                                    },
-                                }
-                            )
-
-                        if tool_output == "":
-                            tool_output = "No output from tool."
-
-                        self.messages.append(
+                        # Create tool call for the code block
+                        tool_call = type(
+                            "ToolCall",
+                            (),
                             {
-                                "role": "tool",
-                                "content": tool_output.strip(),
-                                "tool_call_id": tool_call.id,
+                                "id": f"call_{len(message.tool_calls)}",
+                                "function": type(
+                                    "Function",
+                                    (),
+                                    {
+                                        "name": "bash",
+                                        "arguments": json.dumps(
+                                            {"command": code.strip()}
+                                        ),
+                                    },
+                                ),
+                            },
+                        )
+                        message.tool_calls.append(tool_call)
+
+                    except ValueError:
+                        # Handle malformed code blocks by breaking
+                        break
+
+                # Add any remaining content after the last code block
+                message.content += content
+                raw_response = [raw_response[0]]
+
+            message = None
+            first_token = True
+
+            for chunk in raw_response:
+                yield chunk
+
+                if first_token:
+                    self._spinner.stop()
+                    first_token = False
+
+                if message is None:
+                    message = chunk.choices[0].delta
+
+                if chunk.choices[0].delta.content:
+                    md.feed(chunk.choices[0].delta.content)
+                    await asyncio.sleep(0)
+
+                    if message.content is None:
+                        message.content = chunk.choices[0].delta.content
+                    elif chunk.choices[0].delta.content is not None:
+                        message.content += chunk.choices[0].delta.content
+
+                if chunk.choices[0].delta.tool_calls:
+                    if chunk.choices[0].delta.tool_calls[0].id:
+                        if message.tool_calls is None or chunk.choices[
+                            0
+                        ].delta.tool_calls[0].id not in [
+                            t.id for t in message.tool_calls
+                        ]:
+                            edit.close()
+                            edit = ToolRenderer()
+                            if message.tool_calls is None:
+                                message.tool_calls = []
+                            message.tool_calls.append(
+                                chunk.choices[0].delta.tool_calls[0]
+                            )
+                        current_tool_call = [
+                            t
+                            for t in message.tool_calls
+                            if t.id == chunk.choices[0].delta.tool_calls[0].id
+                        ][0]
+
+                    if chunk.choices[0].delta.tool_calls[0].function.name:
+                        tool_name = (
+                            chunk.choices[0].delta.tool_calls[0].function.name
+                        )
+                        if edit.name is None:
+                            edit.name = tool_name
+                        if current_tool_call.function.name is None:
+                            current_tool_call.function.name = tool_name
+                    if chunk.choices[0].delta.tool_calls[0].function.arguments:
+                        arguments_delta = (
+                            chunk.choices[0].delta.tool_calls[0].function.arguments
+                        )
+                        edit.feed(arguments_delta)
+
+                        if chunk.choices[0].delta != message:
+                            current_tool_call.function.arguments += arguments_delta
+
+                if chunk.choices[0].finish_reason:
+                    edit.close()
+                    edit = ToolRenderer()
+
+            if self.tool_calling:
+                self.messages.append(message)
+
+            print()
+
+            if not message.tool_calls:
+                break
+
+            if self.auto_run:
+                user_approval = "y"
+            else:
+                user_approval = input("\nRun tool(s)? (y/n): ").lower().strip()
+
+            user_content_to_add = []
+
+            for tool_call in message.tool_calls:
+                function_arguments = json.loads(tool_call.function.arguments)
+
+                if user_approval == "y":
+                    result = await tool_collection.run(
+                        name=tool_call.function.name,
+                        tool_input=cast(dict[str, Any], function_arguments),
+                    )
+                else:
+                    result = ToolResult(
+                        output="Tool execution cancelled by user")
+
+                if self.tool_calling:
+                    if result.error:
+                        output = result.error
+                    else:
+                        output = result.output
+
+                    tool_output = ""
+
+                    if output:
+                        tool_output += output
+
+                    if result.base64_image:
+                        tool_output += (
+                            "\nThe user will reply with the tool's image output."
+                        )
+                        user_content_to_add.append(
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{result.base64_image}",
+                                },
                             }
                         )
-                    else:
-                        text_content = (
-                            "This was the output of the tool call. What does it mean/what's next?\n"
-                            + (result.output or "")
-                        )
-                        if result.base64_image:
-                            content = [
-                                {"type": "text", "text": text_content},
-                                {
-                                    "type": "image",
-                                    "image_url": {
-                                        "url": "data:image/png;base64,"
-                                        + result.base64_image
-                                    },
-                                },
-                            ]
-                        else:
-                            content = text_content
 
-                        self.messages.append({"role": "user", "content": content})
+                    if tool_output == "":
+                        tool_output = "No output from tool."
 
-                if user_content_to_add:
                     self.messages.append(
-                        {"role": "user", "content": user_content_to_add}
+                        {
+                            "role": "tool",
+                            "content": tool_output.strip(),
+                            "tool_call_id": tool_call.id,
+                        }
                     )
+                else:
+                    text_content = (
+                        "This was the output of the tool call. What does it mean/what's next?\n"
+                        + (result.output or "")
+                    )
+                    if result.base64_image:
+                        content = [
+                            {"type": "text", "text": text_content},
+                            {
+                                "type": "image",
+                                "image_url": {
+                                    "url": "data:image/png;base64,"
+                                    + result.base64_image
+                                },
+                            },
+                        ]
+                    else:
+                        content = text_content
+
+                    self.messages.append({"role": "user", "content": content})
+
+            if user_content_to_add:
+                self.messages.append(
+                    {"role": "user", "content": user_content_to_add}
+                )
 
     def _ask_user_approval(self) -> str:
         """Ask user for approval to run a tool"""
@@ -1119,7 +1153,8 @@ Notes for using the `str_replace` command:
         convo_section = "### Conversation History\n\n" + conversation
 
         # Combine sections
-        error_details = "\n\n".join([convo_section, error_section, system_section])
+        error_details = "\n\n".join(
+            [convo_section, error_section, system_section])
 
         # Create GitHub issue URL components
         title = quote("Error Report: " + error_type[:100])

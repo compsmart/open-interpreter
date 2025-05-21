@@ -4,6 +4,7 @@ from .base import CLIResult, ToolResult
 from .collection import ToolCollection
 from .computer import ComputerTool
 from .edit import EditTool
+from .test import TestTool
 
 # Temporarily always use simple bash
 if True or os.environ.get("INTERPRETER_SIMPLE_BASH", "").lower() == "true":
@@ -16,6 +17,7 @@ __ALL__ = [
     CLIResult,
     ComputerTool,
     EditTool,
+    TestTool,
     ToolCollection,
     ToolResult,
 ]
