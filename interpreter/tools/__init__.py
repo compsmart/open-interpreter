@@ -4,6 +4,7 @@ from .base import CLIResult, ToolResult
 from .collection import ToolCollection
 from .computer import ComputerTool
 from .edit import EditTool
+from .memory import MemoryTool
 from .test import TestTool
 
 # Temporarily always use simple bash
@@ -17,6 +18,7 @@ __ALL__ = [
     CLIResult,
     ComputerTool,
     EditTool,
+    MemoryTool,
     TestTool,
     ToolCollection,
     ToolResult,

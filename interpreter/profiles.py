@@ -56,7 +56,8 @@ class Profile:
         self.input = None  # Pre-filled first user message
 
         # Available tools and settings
-        self.tools = ["interpreter", "editor", "test"]  # Enabled tool modules
+        self.tools = ["interpreter", "editor",
+                      "memory", "gui"]  # Enabled tool modules
         self.auto_run = False  # Whether to auto-run tools without confirmation
         self.tool_calling = True  # Whether to allow tool/function calling
         self.interactive = sys.stdin.isatty()  # Whether to prompt for input

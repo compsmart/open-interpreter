@@ -1,6 +1,6 @@
 from .ui.tool import ToolRenderer
 from .ui.markdown import MarkdownRenderer
-from .tools import BashTool, ComputerTool, EditTool, TestTool, ToolCollection, ToolResult
+from .tools import BashTool, ComputerTool, EditTool, MemoryTool, TestTool, ToolCollection, ToolResult
 from .profiles import Profile
 from .misc.spinner import SimpleSpinner
 from .commands import CommandHandler
@@ -243,6 +243,8 @@ class Interpreter:
             tools.append(EditTool())
         if "gui" in self.tools:
             tools.append(ComputerTool())
+        if "memory" in self.tools:
+            tools.append(MemoryTool())
         if "test" in self.tools:
             tools.append(TestTool())
 
@@ -580,10 +582,65 @@ class Interpreter:
                                     },
                                     "user_name": {
                                         "type": "string",
-                                        "description": "Optional user name for test2 function"
-                                    }
+                                        "description": "Optional user name for test2 function"}
                                 },
                                 "required": ["function_name"],
+                            },
+                        },
+                    }
+                )
+            if "memory" in self.tools:
+                tools.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "memory",
+                            "description": "Store and recall memories with human-like memory characteristics including decay, using both short-term and long-term memory storage.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "action": {
+                                        "type": "string",
+                                        "enum": ["store", "recall", "forget", "summarize"],
+                                        "description": "The memory operation to perform"
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                        "description": "Content to store in memory (for 'store' action)"
+                                    },
+                                    "query": {
+                                        "type": "string",
+                                        "description": "Text to search for in memories (for 'recall' action)"
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags/keywords for categorizing or filtering memories"
+                                    },
+                                    "memory_id": {
+                                        "type": "integer",
+                                        "description": "ID of a specific memory to forget (for 'forget' action)"
+                                    },
+                                    "older_than_days": {
+                                        "type": "integer",
+                                        "description": "Forget memories older than this many days (for 'forget' action)"
+                                    },
+                                    "days": {
+                                        "type": "integer",
+                                        "description": "Number of days to look back (for 'summarize' action)"
+                                    },
+                                    "limit": {
+                                        "type": "integer",
+                                        "description": "Maximum number of memories to return (for 'recall' action)"
+                                    },
+                                    "use_long_term": {
+                                        "type": "boolean",
+                                        "description": "Whether to check long-term memory if not found in short-term (for 'recall' action)"
+                                    }
+                                },
+                                "required": ["action"],
                             },
                         },
                     }
