@@ -1,6 +1,6 @@
 from .ui.tool import ToolRenderer
 from .ui.markdown import MarkdownRenderer
-from .tools import BashTool, ComputerTool, EditTool, MemoryTool, TestTool, ToolCollection, ToolResult
+from .tools import BashTool, ComputerTool, EditTool, MemoryTool, TestTool, ToolCollection, ToolResult, WebTool
 from .profiles import Profile
 from .misc.spinner import SimpleSpinner
 from .commands import CommandHandler
@@ -245,6 +245,8 @@ class Interpreter:
             tools.append(ComputerTool())
         if "memory" in self.tools:
             tools.append(MemoryTool())
+        if "web" in self.tools:
+            tools.append(WebTool())
         if "test" in self.tools:
             tools.append(TestTool())
 
@@ -634,10 +636,72 @@ class Interpreter:
                                     "limit": {
                                         "type": "integer",
                                         "description": "Maximum number of memories to return (for 'recall' action)"
-                                    },
-                                    "use_long_term": {
+                                    },                                    "use_long_term": {
                                         "type": "boolean",
                                         "description": "Whether to check long-term memory if not found in short-term (for 'recall' action)"
+                                    }
+                                },
+                                "required": ["action"],
+                            },
+                        },
+                    }
+                )
+            if "web" in self.tools:
+                tools.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "web",
+                            "description": "Browse the web, navigate pages, extract data, and interact with web forms.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "action": {
+                                        "type": "string",
+                                        "enum": ["browse", "post", "extract_text", "extract_links",
+                                                 "extract_table", "get_forms", "search", "close"],
+                                        "description": "The web operation to perform"
+                                    },
+                                    "url": {
+                                        "type": "string",
+                                        "description": "URL to browse or post to (for 'browse' and 'post' actions)"
+                                    },
+                                    "params": {
+                                        "type": "object",
+                                        "description": "Query parameters for GET requests (for 'browse' action)"
+                                    },
+                                    "data": {
+                                        "type": "object",
+                                        "description": "Form data for POST requests (for 'post' action)"
+                                    },
+                                    "json_data": {
+                                        "type": "object",
+                                        "description": "JSON data for POST requests (for 'post' action)"
+                                    },
+                                    "headers": {
+                                        "type": "object",
+                                        "description": "Custom HTTP headers"
+                                    },
+                                    "css_selector": {
+                                        "type": "string",
+                                        "description": "CSS selector for extracting specific content (for 'extract_text' action)"
+                                    },
+                                    "filter_regex": {
+                                        "type": "string",
+                                        "description": "Regex pattern for filtering links (for 'extract_links' action)"
+                                    },
+                                    "table_index": {
+                                        "type": "integer",
+                                        "description": "Index of table to extract (for 'extract_table' action)",
+                                        "default": 0
+                                    },
+                                    "form_id": {
+                                        "type": "string",
+                                        "description": "ID of form to submit (for 'post' action)"
+                                    },
+                                    "query": {
+                                        "type": "string",
+                                        "description": "Text to search for in the page (for 'search' action)"
                                     }
                                 },
                                 "required": ["action"],

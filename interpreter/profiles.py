@@ -57,7 +57,7 @@ class Profile:
 
         # Available tools and settings
         self.tools = ["interpreter", "editor",
-                      "memory", "gui"]  # Enabled tool modules
+                      "memory", "gui", "web"]  # Enabled tool modules
         self.auto_run = False  # Whether to auto-run tools without confirmation
         self.tool_calling = True  # Whether to allow tool/function calling
         self.interactive = sys.stdin.isatty()  # Whether to prompt for input
