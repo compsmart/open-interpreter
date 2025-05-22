@@ -6,7 +6,7 @@ from .computer import ComputerTool
 from .edit import EditTool
 from .memory import MemoryTool
 from .test import TestTool
-from .web import WebTool
+from .web import PlaywrightWebTool
 
 # Temporarily always use simple bash
 if True or os.environ.get("INTERPRETER_SIMPLE_BASH", "").lower() == "true":
@@ -23,5 +23,5 @@ __ALL__ = [
     TestTool,
     ToolCollection,
     ToolResult,
-    WebTool,
+    PlaywrightWebTool,
 ]
