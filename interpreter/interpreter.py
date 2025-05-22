@@ -539,7 +539,8 @@ class Interpreter:
                     break
 
             else:
-                tools = []
+                tools = []            # First, add tools with to_params method if available
+            # For tools that don't have to_params, add them manually
             if "interpreter" in self.tools:
                 tools.append(
                     {
@@ -563,148 +564,6 @@ class Interpreter:
                                     }
                                 },
                                 "required": ["command"],
-                            },
-                        },
-                    }
-                )
-            if "test" in self.tools:
-                tools.append(
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "test",
-                            "description": "A test tool with three different functions: test1 outputs 'hello world', test2 outputs a personalized greeting, and test3 outputs 'goodbye'",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "function_name": {
-                                        "type": "string",
-                                        "enum": ["test1", "test2", "test3"],
-                                        "description": "The test function to execute"
-                                    },
-                                    "user_name": {
-                                        "type": "string",
-                                        "description": "Optional user name for test2 function"}
-                                },
-                                "required": ["function_name"],
-                            },
-                        },
-                    }
-                )
-            if "memory" in self.tools:
-                tools.append(
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "memory",
-                            "description": "Store and recall memories with human-like memory characteristics including decay, using both short-term and long-term memory storage.",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "action": {
-                                        "type": "string",
-                                        "enum": ["store", "recall", "forget", "summarize"],
-                                        "description": "The memory operation to perform"
-                                    },
-                                    "content": {
-                                        "type": "string",
-                                        "description": "Content to store in memory (for 'store' action)"
-                                    },
-                                    "query": {
-                                        "type": "string",
-                                        "description": "Text to search for in memories (for 'recall' action)"
-                                    },
-                                    "tags": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string"
-                                        },
-                                        "description": "Tags/keywords for categorizing or filtering memories"
-                                    },
-                                    "memory_id": {
-                                        "type": "integer",
-                                        "description": "ID of a specific memory to forget (for 'forget' action)"
-                                    },
-                                    "older_than_days": {
-                                        "type": "integer",
-                                        "description": "Forget memories older than this many days (for 'forget' action)"
-                                    },
-                                    "days": {
-                                        "type": "integer",
-                                        "description": "Number of days to look back (for 'summarize' action)"
-                                    },
-                                    "limit": {
-                                        "type": "integer",
-                                        "description": "Maximum number of memories to return (for 'recall' action)"
-                                    },                                    "use_long_term": {
-                                        "type": "boolean",
-                                        "description": "Whether to check long-term memory if not found in short-term (for 'recall' action)"
-                                    }
-                                },
-                                "required": ["action"],
-                            },
-                        },
-                    }
-                )
-            if "web" in self.tools:
-                tools.append(
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "web",
-                            "description": "Browse the web, navigate pages, extract data, and interact with web forms.",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "action": {
-                                        "type": "string",
-                                        "enum": ["browse", "post", "extract_text", "extract_links",
-                                                 "extract_table", "get_forms", "search", "close"],
-                                        "description": "The web operation to perform"
-                                    },
-                                    "url": {
-                                        "type": "string",
-                                        "description": "URL to browse or post to (for 'browse' and 'post' actions)"
-                                    },
-                                    "params": {
-                                        "type": "object",
-                                        "description": "Query parameters for GET requests (for 'browse' action)"
-                                    },
-                                    "data": {
-                                        "type": "object",
-                                        "description": "Form data for POST requests (for 'post' action)"
-                                    },
-                                    "json_data": {
-                                        "type": "object",
-                                        "description": "JSON data for POST requests (for 'post' action)"
-                                    },
-                                    "headers": {
-                                        "type": "object",
-                                        "description": "Custom HTTP headers"
-                                    },
-                                    "css_selector": {
-                                        "type": "string",
-                                        "description": "CSS selector for extracting specific content (for 'extract_text' action)"
-                                    },
-                                    "filter_regex": {
-                                        "type": "string",
-                                        "description": "Regex pattern for filtering links (for 'extract_links' action)"
-                                    },
-                                    "table_index": {
-                                        "type": "integer",
-                                        "description": "Index of table to extract (for 'extract_table' action)",
-                                        "default": 0
-                                    },
-                                    "form_id": {
-                                        "type": "string",
-                                        "description": "ID of form to submit (for 'post' action)"
-                                    },
-                                    "query": {
-                                        "type": "string",
-                                        "description": "Text to search for in the page (for 'search' action)"
-                                    }
-                                },
-                                "required": ["action"],
                             },
                         },
                     }
@@ -857,23 +716,53 @@ Notes for using the `str_replace` command:
                 "api_version": self.api_version,
                 # "parallel_tool_calls": True,
             }
-
             if self.tool_calling:
                 params["tools"] = tools
+
+                # If we have a tool collection with to_params-capable tools
+                if hasattr(tool_collection, "tools") and tool_collection.tools:
+                    # For Anthropic provider, use the tool_collection.to_params() directly
+                    if provider == "anthropic":
+                        params["tools"] = tool_collection.to_params()
+                        for t in params["tools"]:
+                            t["function"] = {"name": t["name"]}
+                            if t["name"] == "computer":
+                                t["function"]["parameters"] = {
+                                    "display_height_px": t["display_height_px"],
+                                    "display_width_px": t["display_width_px"],
+                                    "display_number": t["display_number"],
+                                }
+                    # For non-Anthropic providers with tools that implement to_params
+                    else:
+                        # Get existing tools list
+                        existing_tools = params.get("tools", [])
+                        # Add tools from collection that have to_params method
+                        for tool in tool_collection.tools:
+                            if hasattr(tool, "to_params"):
+                                try:
+                                    tool_param = tool.to_params()
+                                    # Convert from Anthropic format to OpenAI format if needed
+                                    if "function" not in tool_param and "name" in tool_param:
+                                        tool_param = {
+                                            "type": "function",
+                                            "function": {
+                                                "name": tool_param["name"],
+                                                "description": tool_param.get("function", {}).get("description", ""),
+                                                "parameters": tool_param.get("function", {}).get("parameters", {})
+                                            }
+                                        }
+                                    existing_tools.append(tool_param)
+                                except Exception as e:
+                                    if self.debug:
+                                        print(
+                                            f"Error getting params for tool {tool}: {e}")
+                                        params["tools"] = existing_tools
             else:
                 params["stream"] = False
                 stream = False
 
-            if provider == "anthropic" and self.tool_calling:
-                params["tools"] = tool_collection.to_params()
-                for t in params["tools"]:
-                    t["function"] = {"name": t["name"]}
-                    if t["name"] == "computer":
-                        t["function"]["parameters"] = {
-                            "display_height_px": t["display_height_px"],
-                            "display_width_px": t["display_width_px"],
-                            "display_number": t["display_number"],
-                        }
+            # Set Anthropic beta header for computer tool if needed
+            if provider == "anthropic" and "gui" in self.tools:
                 params["extra_headers"] = {
                     "anthropic-beta": "computer-use-2024-10-22"
                 }
